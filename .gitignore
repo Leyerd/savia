@@ -1,0 +1,25 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+.DS_Store
+
+# Tauri / Rust
+src-tauri/target/
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/
+android/local.properties
+.gradle/
+
+# Entregables pesados (se regeneran)
+entregables/*.apk
+entregables/*.deb
+entregables/*.rpm
+entregables/Savia-PC
+
+# Logs
+*.log
