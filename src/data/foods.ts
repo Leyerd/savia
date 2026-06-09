@@ -32,7 +32,8 @@ export type FoodCategory =
   | "Sopas y caldos"
   | "Comida rápida"
   | "Platos chilenos"
-  | "Platos globales";
+  | "Platos globales"
+  | "Marcas y envasados";
 
 export interface Food {
   id: string;
@@ -500,5 +501,5 @@ export const CATEGORIES: FoodCategory[] = [
   "Carnes", "Pescados y mariscos", "Huevos",
   "Frutas", "Verduras", "Legumbres y cereales", "Frutos secos",
   "Galletas y dulces", "Postres", "Snacks", "Suplementos",
-  "Salsas y condimentos", "Grasas y aceites", "Bebidas",
+  "Salsas y condimentos", "Grasas y aceites", "Bebidas", "Marcas y envasados",
 ];

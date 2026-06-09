@@ -140,10 +140,12 @@ export interface MacroTargets {
   plan: Plan;
 }
 
-export function computeTargets(p: Profile): MacroTargets {
+// `tdeeOverride`: si se pasa (>0) se usa como gasto total real medido
+// (recalibración dinámica) en vez de la estimación teórica Mifflin × actividad.
+export function computeTargets(p: Profile, tdeeOverride?: number): MacroTargets {
   const base = 10 * p.weightKg + 6.25 * p.heightCm - 5 * p.age;
   const bmr = p.sex === "m" ? base + 5 : base - 161;
-  const tdee = bmr * ACTIVITY_FACTOR[p.activity];
+  const tdee = tdeeOverride && tdeeOverride > 0 ? tdeeOverride : bmr * ACTIVITY_FACTOR[p.activity];
 
   const plan = resolvePlan(p);
 

@@ -5,6 +5,7 @@ import { EXERCISE_BY_ID } from "../data/exercises";
 import type { Food } from "../data/foods";
 import { dateKey } from "../lib/date";
 import { burnedOnDate } from "../lib/energy";
+import { measuredTdee, type MeasuredTDEE } from "../lib/adapt";
 
 // Alimento creado por el usuario o la IA (valores por 100 g, como los de la base).
 export type CustomFood = Food & { custom: true; source?: "ia" | "manual" };
@@ -51,6 +52,7 @@ interface State {
   bg: string;                                    // fondo (aurora, mesh, sunset, ocean, grid, solid)
   customFoods: CustomFood[];                      // alimentos creados por el usuario o la IA
   eatBack: boolean;                              // sumar el gasto del entreno al objetivo del día
+  adaptive: boolean;                             // recalibrar el TDEE con peso+ingesta reales
 
   // acciones
   setProfile: (p: Profile) => void;
@@ -58,6 +60,7 @@ interface State {
   setTheme: (t: string) => void;
   setBg: (b: string) => void;
   setEatBack: (v: boolean) => void;
+  setAdaptive: (v: boolean) => void;
   addWater: (date: string, ml: number) => void;
   addCustomFood: (f: Omit<CustomFood, "id" | "custom">) => CustomFood;
   removeCustomFood: (id: string) => void;
@@ -73,6 +76,7 @@ interface State {
 
   targets: () => MacroTargets;
   burnedOn: (date: string) => number;
+  measuredTdee: () => MeasuredTDEE | null;
   getLevel: (exerciseId: string) => number;
 }
 
@@ -93,12 +97,14 @@ export const useStore = create<State>()(
       bg: "aurora",
       customFoods: [],
       eatBack: false,
+      adaptive: false,
 
       setProfile: (p) => set({ profile: p }),
       setApiKey: (k) => set({ apiKey: k }),
       setTheme: (t) => set({ theme: t }),
       setBg: (b) => set({ bg: b }),
       setEatBack: (v) => set({ eatBack: v }),
+      setAdaptive: (v) => set({ adaptive: v }),
 
       addWater: (date, ml) =>
         set((s) => ({ water: { ...s.water, [date]: Math.max(0, (s.water[date] ?? 0) + ml) } })),
@@ -116,7 +122,7 @@ export const useStore = create<State>()(
         return JSON.stringify(
           { profile: s.profile, diary: s.diary, progress: s.progress, weights: s.weights,
             water: s.water, completedDays: s.completedDays, customFoods: s.customFoods,
-            theme: s.theme, bg: s.bg, eatBack: s.eatBack, v: 1 },
+            theme: s.theme, bg: s.bg, eatBack: s.eatBack, adaptive: s.adaptive, v: 1 },
           null, 2
         );
       },
@@ -135,6 +141,7 @@ export const useStore = create<State>()(
             theme: d.theme ?? s.theme,
             bg: d.bg ?? s.bg,
             eatBack: d.eatBack ?? s.eatBack,
+            adaptive: d.adaptive ?? s.adaptive,
           }));
           return true;
         } catch { return false; }
@@ -211,9 +218,15 @@ export const useStore = create<State>()(
       removeWeight: (date) =>
         set((s) => ({ weights: s.weights.filter((w) => w.date !== date) })),
 
-      targets: () => computeTargets(get().profile),
+      targets: () => {
+        const s = get();
+        const m = s.adaptive ? measuredTdee(s.diary, s.weights) : null;
+        return computeTargets(s.profile, m?.tdee);
+      },
 
       burnedOn: (date) => burnedOnDate(get().progress, date, get().profile.weightKg),
+
+      measuredTdee: () => measuredTdee(get().diary, get().weights),
     }),
     { name: "savia-store-v1" }
   )

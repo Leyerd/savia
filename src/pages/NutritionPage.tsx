@@ -1,6 +1,6 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Trash2, Search, Camera, X, Sparkles, ChevronLeft, ChevronRight, Droplet, Minus, Flame } from "lucide-react";
+import { Plus, Trash2, Search, Camera, X, Sparkles, ChevronLeft, ChevronRight, Droplet, Minus, Flame, Barcode } from "lucide-react";
 import { Header } from "../components/Header";
 import { Sheet } from "../components/Sheet";
 import { MacroRing, MacroBar } from "../components/MacroRing";
@@ -10,6 +10,8 @@ import { FOODS, CATEGORIES, type Food } from "../data/foods";
 import { dateKey, prettyDate } from "../lib/date";
 import { sumEntries, scale } from "../lib/totals";
 import { identifyFood, fileToBase64, type AIFoodResult } from "../lib/gemini";
+import { lookupBarcode, type BarcodeProduct } from "../lib/barcode";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 
 const MEALS: Meal[] = ["Desayuno", "Almuerzo", "Once", "Cena", "Snack"];
 
@@ -34,6 +36,7 @@ export function NutritionPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [barOpen, setBarOpen] = useState(false);
 
   useEffect(() => {
     if (params.get("ai") === "1") { setAiOpen(true); params.delete("ai"); setParams(params, { replace: true }); }
@@ -92,6 +95,9 @@ export function NutritionPage() {
         <button className="btn btn-primary btn-block" onClick={() => setAddOpen(true)}><Plus size={18} /> Agregar</button>
         <button className="btn btn-ghost btn-block" onClick={() => setAiOpen(true)}><Camera size={18} /> Escanear IA</button>
       </div>
+      <button className="btn btn-ghost btn-block" style={{ marginBottom: 4 }} onClick={() => setBarOpen(true)}>
+        <Barcode size={18} /> Escanear código de barras
+      </button>
 
       {MEALS.map((meal) => {
         const items = entries.filter((e) => e.meal === meal);
@@ -128,6 +134,7 @@ export function NutritionPage() {
 
       {addOpen && <AddFoodSheet date={date} onClose={() => setAddOpen(false)} />}
       {aiOpen && <AISheet date={date} onClose={() => setAiOpen(false)} />}
+      {barOpen && <BarcodeSheet date={date} onClose={() => setBarOpen(false)} />}
     </section>
   );
 }
@@ -317,6 +324,172 @@ function CustomFoodSheet({ date, onBack, onDone }: { date: string; onBack: () =>
         Total: <strong style={{ color: "var(--peach)" }}>{kcalCalc} kcal</strong> · P{p} C{c} G{f}
       </div>
       <button className="btn btn-primary btn-block" style={{ marginTop: 12 }} onClick={add}>Agregar al diario</button>
+    </Sheet>
+  );
+}
+
+function BarcodeSheet({ date, onClose }: { date: string; onClose: () => void }) {
+  const addFood = useStore((s) => s.addFood);
+  const addCustomFood = useStore((s) => s.addCustomFood);
+  const toast = useToast((s) => s.show);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const controlsRef = useRef<{ stop: () => void } | null>(null);
+
+  const [scanning, setScanning] = useState(true);
+  const [camError, setCamError] = useState<string | null>(null);
+  const [manual, setManual] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [notFound, setNotFound] = useState<string | null>(null);
+  const [product, setProduct] = useState<BarcodeProduct | null>(null);
+
+  const [grams, setGrams] = useState(0);
+  const [meal, setMeal] = useState<Meal>("Snack");
+  const [saveDb, setSaveDb] = useState(true);
+
+  const stopCam = () => { controlsRef.current?.stop(); controlsRef.current = null; };
+
+  const handleCode = async (code: string) => {
+    stopCam(); setScanning(false); setLoading(true); setNotFound(null);
+    try {
+      const prod = await lookupBarcode(code);
+      if (!prod) { setNotFound(code); }
+      else { setProduct(prod); setGrams(prod.portion ?? 100); }
+    } catch (e) {
+      setNotFound(code);
+      toast(e instanceof Error ? e.message : "Error de red", "default");
+    } finally { setLoading(false); }
+  };
+
+  // Inicia la cámara al abrir.
+  useEffect(() => {
+    if (!scanning) return;
+    let cancelled = false;
+    const reader = new BrowserMultiFormatReader();
+    (async () => {
+      try {
+        const controls = await reader.decodeFromConstraints(
+          { video: { facingMode: "environment" } },
+          videoRef.current!,
+          (result) => { if (result && !cancelled) handleCode(result.getText()); }
+        );
+        controlsRef.current = controls;
+      } catch {
+        if (!cancelled) setCamError("No se pudo abrir la cámara. Ingresa el código manualmente.");
+      }
+    })();
+    return () => { cancelled = true; stopCam(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanning]);
+
+  // Macros escalados a la cantidad elegida (los del producto son por 100 g).
+  const m = product ? scale(product, grams) : { kcal: 0, p: 0, c: 0, f: 0 };
+
+  const add = () => {
+    if (!product) return;
+    if (saveDb) {
+      addCustomFood({
+        name: product.brand ? `${product.name} (${product.brand})` : product.name,
+        category: "Marcas y envasados",
+        kcal: product.kcal, p: product.p, c: product.c, f: product.f,
+        portion: product.portion ?? 100,
+        portionLabel: product.portionLabel ?? "100 g",
+        source: "manual",
+      });
+    }
+    addFood(date, { name: product.name, grams, kcal: m.kcal, p: m.p, c: m.c, f: m.f, meal });
+    toast(saveDb ? "Agregado y guardado en tu base ✅" : "Producto agregado ✅", "success");
+    onClose();
+  };
+
+  const reset = () => { setProduct(null); setNotFound(null); setManual(""); setScanning(true); };
+
+  return (
+    <Sheet open onClose={onClose}>
+      <div className="row between">
+        <h2 style={{ display: "flex", gap: 8, alignItems: "center" }}><Barcode size={18} color="var(--mauve)" /> Código de barras</h2>
+        <button className="iconbtn" onClick={onClose}><X size={18} /></button>
+      </div>
+
+      {scanning && !product && (
+        <>
+          {!camError ? (
+            <>
+              <div style={{ position: "relative", marginTop: 10, borderRadius: 14, overflow: "hidden", background: "#000" }}>
+                <video ref={videoRef} style={{ width: "100%", display: "block", maxHeight: "40vh", objectFit: "cover" }} muted playsInline />
+                <div style={{ position: "absolute", inset: "30% 12%", border: "2px solid var(--green)", borderRadius: 10, boxShadow: "0 0 0 9999px rgba(0,0,0,.25)" }} />
+              </div>
+              <p className="center muted tiny" style={{ marginTop: 8 }}>Apunta al código de barras del producto 📷</p>
+            </>
+          ) : (
+            <p className="tiny" style={{ color: "var(--peach)", marginTop: 10 }}>{camError}</p>
+          )}
+
+          <div className="row" style={{ gap: 8, marginTop: 12, alignItems: "flex-end" }}>
+            <label className="field grow"><span className="lbl">…o escribe el código</span>
+              <input inputMode="numeric" placeholder="7800000000000" value={manual} onChange={(e) => setManual(e.target.value)} />
+            </label>
+            <button className="btn btn-primary" disabled={!manual.trim()} onClick={() => handleCode(manual)}>Buscar</button>
+          </div>
+        </>
+      )}
+
+      {loading && <p className="center muted" style={{ marginTop: 14 }}>🔍 Buscando en Open Food Facts…</p>}
+
+      {notFound && !loading && (
+        <div className="card" style={{ marginTop: 12, borderColor: "var(--peach)" }}>
+          <div className="tiny">No encontramos el código <strong>{notFound}</strong> en la base mundial.</div>
+          <div className="row" style={{ gap: 8, marginTop: 10 }}>
+            <button className="btn btn-ghost btn-sm grow" onClick={reset}>Reintentar</button>
+          </div>
+          <div className="tiny muted center" style={{ marginTop: 6 }}>Puedes agregarlo con “+ Personalizado” en Agregar.</div>
+        </div>
+      )}
+
+      {product && (
+        <>
+          <div className="card" style={{ marginTop: 12 }}>
+            <div className="row" style={{ gap: 10 }}>
+              {product.image && <img src={product.image} alt="" style={{ width: 54, height: 54, borderRadius: 10, objectFit: "cover" }} />}
+              <div className="grow">
+                <strong>{product.name}</strong>
+                <div className="muted tiny">{product.brand ? `${product.brand} · ` : ""}{product.kcal} kcal/100 g</div>
+              </div>
+            </div>
+            <div className="row" style={{ gap: 10, marginTop: 10 }}>
+              <label className="field grow"><span className="lbl">Cantidad (g)</span>
+                <input type="number" inputMode="numeric" value={grams} onChange={(e) => setGrams(Math.max(0, +e.target.value))} />
+              </label>
+              <label className="field" style={{ width: 130 }}><span className="lbl">Comida</span>
+                <select value={meal} onChange={(e) => setMeal(e.target.value as Meal)}>
+                  {MEALS.map((mm) => <option key={mm} value={mm}>{mm}</option>)}
+                </select>
+              </label>
+            </div>
+            {product.portion && (
+              <div className="chips" style={{ marginTop: 8 }}>
+                <button className="chip" onClick={() => setGrams(product.portion!)}>1 porción ({product.portion} g)</button>
+                <button className="chip" onClick={() => setGrams(100)}>100 g</button>
+              </div>
+            )}
+            <div className="grid2" style={{ marginTop: 10 }}>
+              <div className="stat"><div className="v" style={{ color: "var(--m-kcal)" }}>{m.kcal}</div><div className="k">kcal</div></div>
+              <div className="stat"><div className="v" style={{ color: "var(--m-prot)" }}>{m.p}</div><div className="k">Proteína</div></div>
+              <div className="stat"><div className="v" style={{ color: "var(--m-carb)" }}>{m.c}</div><div className="k">Carbos</div></div>
+              <div className="stat"><div className="v" style={{ color: "var(--m-fat)" }}>{m.f}</div><div className="k">Grasa</div></div>
+            </div>
+          </div>
+
+          <label className="list-item" style={{ marginTop: 10, cursor: "pointer" }}>
+            <input type="checkbox" style={{ width: 18, height: 18 }} checked={saveDb} onChange={(e) => setSaveDb(e.target.checked)} />
+            <div className="grow tiny">Guardar en mi base de datos para reutilizarlo después</div>
+          </label>
+
+          <div className="row" style={{ gap: 8, marginTop: 12 }}>
+            <button className="btn btn-ghost grow" onClick={reset}>Escanear otro</button>
+            <button className="btn btn-primary grow" onClick={add}>Agregar al diario</button>
+          </div>
+        </>
+      )}
     </Sheet>
   );
 }

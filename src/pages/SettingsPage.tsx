@@ -4,7 +4,7 @@ import { useToast } from "../components/Toast";
 import { useStore } from "../store/useStore";
 import { useRef } from "react";
 import { computeTargets, estimateBodyFat, resolvePlan, type Activity, type Goal, type Profile, type Sex } from "../lib/macros";
-import { Save, KeyRound, User, ExternalLink, Scale, Trash2, Target, Palette, Download, Upload, Flame } from "lucide-react";
+import { Save, KeyRound, User, ExternalLink, Scale, Trash2, Target, Palette, Download, Upload, Flame, Activity as ActivityIcon } from "lucide-react";
 import { prettyDate } from "../lib/date";
 
 const THEMES = [
@@ -127,6 +127,8 @@ export function SettingsPage() {
 
       <WeightCard />
 
+      <AdaptiveCard />
+
       <BridgeCard />
 
       <div className="card">
@@ -216,6 +218,59 @@ function DataCard() {
       </div>
       <input ref={fileRef} type="file" accept="application/json" style={{ display: "none" }}
         onChange={(e) => e.target.files?.[0] && doImport(e.target.files[0])} />
+    </div>
+  );
+}
+
+function AdaptiveCard() {
+  const adaptive = useStore((s) => s.adaptive);
+  const setAdaptive = useStore((s) => s.setAdaptive);
+  const profile = useStore((s) => s.profile);
+  const m = useStore((s) => s.measuredTdee)();
+  const theoretical = computeTargets(profile).tdee;
+  const confColor = m?.confidence === "alta" ? "var(--green)" : m?.confidence === "media" ? "var(--peach)" : "var(--red)";
+
+  return (
+    <div className="card">
+      <h2 style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <ActivityIcon size={18} color="var(--green)" /> Gasto real (TDEE adaptativo)
+      </h2>
+      <label className="row between" style={{ gap: 12, cursor: "pointer", alignItems: "flex-start" }}>
+        <div className="grow">
+          <div style={{ fontWeight: 600 }}>Ajustar mis calorías con datos reales</div>
+          <p className="tiny muted" style={{ marginTop: 4 }}>
+            En vez de confiar solo en una fórmula, la app deduce tu gasto real comparando
+            lo que comes con cómo cambia tu peso, y recalcula tus metas.
+          </p>
+        </div>
+        <input
+          type="checkbox"
+          checked={adaptive}
+          onChange={(e) => setAdaptive(e.target.checked)}
+          style={{ width: 22, height: 22, accentColor: "var(--green)", marginTop: 2 }}
+        />
+      </label>
+
+      {m ? (
+        <>
+          <div className="grid3" style={{ marginTop: 12 }}>
+            <div className="stat"><div className="v" style={{ color: "var(--m-kcal)" }}>{m.tdee}</div><div className="k">Gasto real</div></div>
+            <div className="stat"><div className="v">{theoretical}</div><div className="k">Teórico</div></div>
+            <div className="stat"><div className="v" style={{ color: confColor }}>{m.confidence}</div><div className="k">Confianza</div></div>
+          </div>
+          <div className="tiny muted" style={{ marginTop: 8 }}>
+            Basado en {m.loggedDays} días con registro y {m.spanDays} días entre pesajes
+            ({m.weightChangeKg > 0 ? "+" : ""}{m.weightChangeKg} kg · ingesta media {m.meanIntake} kcal).
+            {m.confidence === "baja" && " Registra con más constancia para mejorar la precisión."}
+          </div>
+        </>
+      ) : (
+        <div className="tiny muted" style={{ marginTop: 10 }}>
+          Aún no hay datos suficientes. Necesitas <strong>≥2 pesajes</strong> separados al menos
+          una semana y <strong>≥7 días</strong> con comida registrada. Mientras tanto se usa la
+          estimación teórica ({theoretical} kcal).
+        </div>
+      )}
     </div>
   );
 }
