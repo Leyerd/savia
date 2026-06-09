@@ -8,7 +8,7 @@ import { EXERCISE_BY_ID, type Exercise } from "../data/exercises";
 import { useStore, type SetLog } from "../store/useStore";
 import { sessionKcal } from "../lib/energy";
 import { todayWeekdayKey, dateKey } from "../lib/date";
-import { Timer, Lock, Trophy, Info, Dumbbell, Flame, ChevronUp, ChevronDown, CheckCircle2 } from "lucide-react";
+import { Timer, Lock, Trophy, Info, Dumbbell, Flame, ChevronUp, ChevronDown, CheckCircle2, FlaskConical } from "lucide-react";
 
 export function RoutinePage() {
   const [sel, setSel] = useState(todayWeekdayKey());
@@ -23,6 +23,8 @@ export function RoutinePage() {
         sub="Enfoque sixpack · progresión por niveles"
         right={<button className="iconbtn" onClick={() => setShowGuide(true)}><Info size={18} /></button>}
       />
+
+      <TesterBanner />
 
       <div className="chips" style={{ marginBottom: 14 }}>
         {WEEKLY_ROUTINE.map((d) => (
@@ -76,11 +78,26 @@ export function RoutinePage() {
   );
 }
 
+function TesterBanner() {
+  const testerMode = useStore((s) => s.testerMode);
+  if (!testerMode) return null;
+  return (
+    <div className="card" style={{ borderColor: "var(--mauve)", display: "flex", gap: 8, alignItems: "center", padding: "10px 14px" }}>
+      <FlaskConical size={16} color="var(--mauve)" />
+      <div className="tiny" style={{ color: "var(--mauve)", fontWeight: 600 }}>
+        Modo dueño/tester activo · todos los niveles desbloqueados (elige el que quieras)
+      </div>
+    </div>
+  );
+}
+
 function ExerciseCard({ ex, note, onLog }: { ex: Exercise; note?: string; onLog: () => void }) {
   const level = useStore((s) => s.getLevel(ex.id));
   const setLevel = useStore((s) => s.setLevel);
+  const testerMode = useStore((s) => s.testerMode);
   const lvl = ex.levels[level];
   const [open, setOpen] = useState(false);
+  const unlocked = (i: number) => testerMode || i <= level;
 
   return (
     <div className="card">
@@ -122,18 +139,24 @@ function ExerciseCard({ ex, note, onLog }: { ex: Exercise; note?: string; onLog:
           <div className="muted tiny" style={{ marginBottom: 8 }}>💡 {ex.progressionTip}</div>
           {note && <div className="tiny" style={{ color: "var(--teal)" }}>Nota: {note}</div>}
           <h3 style={{ marginTop: 10 }}>Niveles desbloqueables</h3>
-          {ex.levels.map((l, i) => (
-            <div key={i} className="list-item" style={{ opacity: i <= level ? 1 : 0.55 }}>
-              {i <= level ? <Trophy size={15} color="var(--green)" /> : <Lock size={15} />}
-              <div className="grow">
-                <div className="tiny" style={{ fontWeight: 600 }}>Nivel {i + 1}: {l.name}</div>
-                <div className="muted tiny">{l.cue}</div>
+          {ex.levels.map((l, i) => {
+            const ok = unlocked(i);
+            return (
+              <div key={i} className="list-item" style={{ opacity: ok ? 1 : 0.55 }}>
+                {ok ? <Trophy size={15} color="var(--green)" /> : <Lock size={15} />}
+                <div className="grow">
+                  <div className="tiny" style={{ fontWeight: 600 }}>
+                    Nivel {i + 1}: {l.name}
+                    {i === level && <span className="pill mauve" style={{ marginLeft: 6 }}>actual</span>}
+                  </div>
+                  <div className="muted tiny">{l.cue}</div>
+                </div>
+                {ok && i !== level && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => setLevel(ex.id, i)}>Usar</button>
+                )}
               </div>
-              {i <= level && i !== level && (
-                <button className="btn btn-ghost btn-sm" onClick={() => setLevel(ex.id, i)}>Usar</button>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

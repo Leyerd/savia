@@ -4,8 +4,9 @@ import { useToast } from "../components/Toast";
 import { useStore } from "../store/useStore";
 import { useRef } from "react";
 import { computeTargets, estimateBodyFat, resolvePlan, type Activity, type Goal, type Profile, type Sex } from "../lib/macros";
-import { Save, KeyRound, User, ExternalLink, Scale, Trash2, Target, Palette, Download, Upload, Flame, Activity as ActivityIcon } from "lucide-react";
+import { Save, KeyRound, User, ExternalLink, Scale, Trash2, Target, Palette, Download, Upload, Flame, Activity as ActivityIcon, FlaskConical, Trophy } from "lucide-react";
 import { prettyDate } from "../lib/date";
+import { EXERCISE_BY_ID } from "../data/exercises";
 
 const THEMES = [
   { id: "savia", name: "Savia 🌿", c: "#157A4E" },
@@ -148,6 +149,8 @@ export function SettingsPage() {
       </div>
 
       <DataCard />
+
+      <TesterCard />
 
       <div className="card center tiny muted">
         Savia v1.0 · Lo que comes alimenta lo que entrenas 🌿
@@ -316,6 +319,65 @@ function BridgeCard() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function TesterCard() {
+  const testerMode = useStore((s) => s.testerMode);
+  const setTesterMode = useStore((s) => s.setTesterMode);
+  const setLevel = useStore((s) => s.setLevel);
+  const toast = useToast((s) => s.show);
+
+  const allExercises = Object.values(EXERCISE_BY_ID);
+
+  const maxAll = () => {
+    allExercises.forEach((ex) => setLevel(ex.id, ex.levels.length - 1));
+    toast("Todos los ejercicios al nivel máximo 🏆", "success");
+  };
+  const resetAll = () => {
+    allExercises.forEach((ex) => setLevel(ex.id, 0));
+    toast("Niveles reiniciados a 1", "success");
+  };
+
+  return (
+    <div className="card" style={{ borderColor: testerMode ? "var(--mauve)" : undefined }}>
+      <h2 style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <FlaskConical size={18} color="var(--mauve)" /> Modo dueño / tester
+      </h2>
+      <label className="row between" style={{ gap: 12, cursor: "pointer", alignItems: "flex-start" }}>
+        <div className="grow">
+          <div style={{ fontWeight: 600 }}>Desbloquear todo</div>
+          <p className="tiny muted" style={{ marginTop: 4 }}>
+            Quita los candados de progresión: en Rutina puedes elegir cualquier nivel de cada
+            ejercicio al instante, sin tener que cumplir el objetivo dos sesiones seguidas.
+            Pensado para que pruebes y compares todos los niveles.
+          </p>
+        </div>
+        <input
+          type="checkbox"
+          checked={testerMode}
+          onChange={(e) => setTesterMode(e.target.checked)}
+          style={{ width: 22, height: 22, accentColor: "var(--mauve)", marginTop: 2 }}
+        />
+      </label>
+
+      {testerMode && (
+        <>
+          <div className="grid2" style={{ marginTop: 12 }}>
+            <button className="btn btn-ghost btn-block" onClick={maxAll}>
+              <Trophy size={16} /> Todo al máximo
+            </button>
+            <button className="btn btn-ghost btn-block" onClick={resetAll}>
+              Reiniciar a nivel 1
+            </button>
+          </div>
+          <div className="tiny muted" style={{ marginTop: 8 }}>
+            Estos botones cambian tu progreso real. Útiles para testear; úsalos con cuidado si
+            también usas la app en serio.
+          </div>
+        </>
+      )}
     </div>
   );
 }

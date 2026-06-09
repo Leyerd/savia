@@ -53,6 +53,7 @@ interface State {
   customFoods: CustomFood[];                      // alimentos creados por el usuario o la IA
   eatBack: boolean;                              // sumar el gasto del entreno al objetivo del día
   adaptive: boolean;                             // recalibrar el TDEE con peso+ingesta reales
+  testerMode: boolean;                           // modo dueño/tester: todo desbloqueado
 
   // acciones
   setProfile: (p: Profile) => void;
@@ -61,6 +62,7 @@ interface State {
   setBg: (b: string) => void;
   setEatBack: (v: boolean) => void;
   setAdaptive: (v: boolean) => void;
+  setTesterMode: (v: boolean) => void;
   addWater: (date: string, ml: number) => void;
   addCustomFood: (f: Omit<CustomFood, "id" | "custom">) => CustomFood;
   removeCustomFood: (id: string) => void;
@@ -98,6 +100,7 @@ export const useStore = create<State>()(
       customFoods: [],
       eatBack: false,
       adaptive: false,
+      testerMode: false,
 
       setProfile: (p) => set({ profile: p }),
       setApiKey: (k) => set({ apiKey: k }),
@@ -105,6 +108,7 @@ export const useStore = create<State>()(
       setBg: (b) => set({ bg: b }),
       setEatBack: (v) => set({ eatBack: v }),
       setAdaptive: (v) => set({ adaptive: v }),
+      setTesterMode: (v) => set({ testerMode: v }),
 
       addWater: (date, ml) =>
         set((s) => ({ water: { ...s.water, [date]: Math.max(0, (s.water[date] ?? 0) + ml) } })),
@@ -122,7 +126,8 @@ export const useStore = create<State>()(
         return JSON.stringify(
           { profile: s.profile, diary: s.diary, progress: s.progress, weights: s.weights,
             water: s.water, completedDays: s.completedDays, customFoods: s.customFoods,
-            theme: s.theme, bg: s.bg, eatBack: s.eatBack, adaptive: s.adaptive, v: 1 },
+            theme: s.theme, bg: s.bg, eatBack: s.eatBack, adaptive: s.adaptive,
+            testerMode: s.testerMode, v: 1 },
           null, 2
         );
       },
@@ -142,6 +147,7 @@ export const useStore = create<State>()(
             bg: d.bg ?? s.bg,
             eatBack: d.eatBack ?? s.eatBack,
             adaptive: d.adaptive ?? s.adaptive,
+            testerMode: d.testerMode ?? s.testerMode,
           }));
           return true;
         } catch { return false; }
