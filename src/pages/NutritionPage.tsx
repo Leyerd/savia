@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Trash2, Search, Camera, X, Sparkles, ChevronLeft, ChevronRight, Droplet, Minus } from "lucide-react";
+import { Plus, Trash2, Search, Camera, X, Sparkles, ChevronLeft, ChevronRight, Droplet, Minus, Flame } from "lucide-react";
 import { Header } from "../components/Header";
 import { Sheet } from "../components/Sheet";
 import { MacroRing, MacroBar } from "../components/MacroRing";
@@ -23,8 +23,14 @@ export function NutritionPage() {
   const diary = useStore((s) => s.diary);
   const removeFood = useStore((s) => s.removeFood);
   const targets = useStore((s) => s.targets)();
+  const eatBack = useStore((s) => s.eatBack);
+  const burned = useStore((s) => s.burnedOn)(date);
   const entries = diary[date] ?? [];
   const totals = sumEntries(entries);
+
+  // El puente: si "sumar entreno" está activo, el objetivo del día crece con lo quemado.
+  const goalKcal = targets.kcal + (eatBack ? burned : 0);
+  const remaining = Math.max(0, goalKcal - totals.kcal);
 
   const [addOpen, setAddOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -51,16 +57,33 @@ export function NutritionPage() {
           </button>
         </div>
         <div className="row" style={{ gap: 18 }}>
-          <MacroRing value={totals.kcal} max={targets.kcal} />
+          <MacroRing value={totals.kcal} max={goalKcal} />
           <div className="grow">
             <MacroBar label="Proteína" value={totals.p} target={targets.protein} color="var(--m-prot)" />
             <MacroBar label="Carbos" value={totals.c} target={targets.carbs} color="var(--m-carb)" />
             <MacroBar label="Grasa" value={totals.f} target={targets.fat} color="var(--m-fat)" />
             <div className="tiny muted" style={{ marginTop: 8 }}>
-              Restan <strong style={{ color: "var(--green)" }}>{Math.max(0, targets.kcal - totals.kcal)}</strong> kcal
+              Restan <strong style={{ color: "var(--green)" }}>{remaining}</strong> kcal
+              {eatBack && burned > 0 && (
+                <span> · meta {goalKcal} <span style={{ color: "var(--peach)" }}>(+{burned} 🔥)</span></span>
+              )}
             </div>
           </div>
         </div>
+
+        {burned > 0 && (
+          <div className="list-item" style={{ marginTop: 10, borderTop: "1px solid var(--surface2, rgba(0,0,0,.06))", paddingTop: 10 }}>
+            <Flame size={16} color="var(--peach)" />
+            <div className="grow" style={{ marginLeft: 8 }}>
+              <div style={{ fontWeight: 600 }}>Entreno de hoy · ~{burned} kcal</div>
+              <div className="muted tiny">
+                {eatBack
+                  ? "Sumadas a tu objetivo del día."
+                  : "Lo que entrenas ya está en tu meta. Actívalo en Ajustes para sumarlo aparte."}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <WaterCard date={date} target={targets.waterMl} fiber={targets.fiber} />

@@ -29,9 +29,13 @@ export function Home() {
   const diary = useStore((s) => s.diary);
   const completedDays = useStore((s) => s.completedDays);
   const targets = useStore((s) => s.targets)();
+  const eatBack = useStore((s) => s.eatBack);
   const today = dateKey();
+  const burned = useStore((s) => s.burnedOn)(today);
   const totals = sumEntries(diary[today]);
   const streak = computeStreak(completedDays);
+
+  const goalKcal = targets.kcal + (eatBack ? burned : 0);
 
   const wk = todayWeekdayKey();
   const day = WEEKLY_ROUTINE.find((d) => d.day === wk) ?? WEEKLY_ROUTINE[0];
@@ -52,18 +56,41 @@ export function Home() {
             <h3 style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <Flame size={16} color="var(--peach)" /> Hoy
             </h3>
-            <div className="muted tiny">Meta {targets.kcal} kcal · {targets.plan.title}</div>
+            <div className="muted tiny">Meta {goalKcal} kcal · {targets.plan.title}</div>
           </div>
           <Link to="/nutricion" className="btn btn-sm btn-ghost">Registrar</Link>
         </div>
         <div className="row" style={{ gap: 18, marginTop: 8 }}>
-          <MacroRing value={totals.kcal} max={targets.kcal} />
+          <MacroRing value={totals.kcal} max={goalKcal} />
           <div className="grow">
             <MacroBar label="Proteína" value={totals.p} target={targets.protein} color="var(--m-prot)" />
             <MacroBar label="Carbos" value={totals.c} target={targets.carbs} color="var(--m-carb)" />
             <MacroBar label="Grasa" value={totals.f} target={targets.fat} color="var(--m-fat)" />
           </div>
         </div>
+
+        {/* El puente: nutrición ⟷ ejercicio */}
+        <div className="row between" style={{ marginTop: 12, gap: 8, flexWrap: "wrap" }}>
+          <div className="center grow" style={{ minWidth: 70 }}>
+            <div style={{ fontWeight: 700, color: "var(--m-kcal)" }}>{Math.round(totals.kcal)}</div>
+            <div className="muted tiny">comido</div>
+          </div>
+          <div className="center grow" style={{ minWidth: 70 }}>
+            <div style={{ fontWeight: 700, color: "var(--peach)" }}>{burned > 0 ? `+${burned}` : "—"}</div>
+            <div className="muted tiny">entreno 🔥</div>
+          </div>
+          <div className="center grow" style={{ minWidth: 70 }}>
+            <div style={{ fontWeight: 700, color: "var(--green)" }}>{Math.max(0, goalKcal - totals.kcal)}</div>
+            <div className="muted tiny">restan</div>
+          </div>
+        </div>
+        {burned > 0 && (
+          <div className="muted tiny center" style={{ marginTop: 8 }}>
+            {eatBack
+              ? `Hoy entrenaste: tu objetivo subió a ${goalKcal} kcal.`
+              : "Lo que comes alimenta lo que entrenas 🌿"}
+          </div>
+        )}
       </div>
 
       <div className="card">

@@ -4,7 +4,7 @@ import { useToast } from "../components/Toast";
 import { useStore } from "../store/useStore";
 import { useRef } from "react";
 import { computeTargets, estimateBodyFat, resolvePlan, type Activity, type Goal, type Profile, type Sex } from "../lib/macros";
-import { Save, KeyRound, User, ExternalLink, Scale, Trash2, Target, Palette, Download, Upload } from "lucide-react";
+import { Save, KeyRound, User, ExternalLink, Scale, Trash2, Target, Palette, Download, Upload, Flame } from "lucide-react";
 import { prettyDate } from "../lib/date";
 
 const THEMES = [
@@ -127,6 +127,8 @@ export function SettingsPage() {
 
       <WeightCard />
 
+      <BridgeCard />
+
       <div className="card">
         <h2 style={{ display: "flex", gap: 8, alignItems: "center" }}><KeyRound size={18} color="var(--sapphire)" /> IA · Gemini (gratis)</h2>
         <p className="tiny muted">
@@ -214,6 +216,51 @@ function DataCard() {
       </div>
       <input ref={fileRef} type="file" accept="application/json" style={{ display: "none" }}
         onChange={(e) => e.target.files?.[0] && doImport(e.target.files[0])} />
+    </div>
+  );
+}
+
+function BridgeCard() {
+  const eatBack = useStore((s) => s.eatBack);
+  const setEatBack = useStore((s) => s.setEatBack);
+  const activity = useStore((s) => s.profile.activity);
+  const lowActivity = activity === "sedentario" || activity === "ligero";
+
+  return (
+    <div className="card">
+      <h2 style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <Flame size={18} color="var(--peach)" /> Puente nutrición ⟷ ejercicio
+      </h2>
+      <label className="row between" style={{ gap: 12, cursor: "pointer", alignItems: "flex-start" }}>
+        <div className="grow">
+          <div style={{ fontWeight: 600 }}>Sumar el entreno al objetivo del día</div>
+          <p className="tiny muted" style={{ marginTop: 4 }}>
+            Cuando registras un entreno, las calorías quemadas se añaden a tu meta de ese día
+            (presupuesto dinámico: entrenas más → comes más).
+          </p>
+        </div>
+        <input
+          type="checkbox"
+          checked={eatBack}
+          onChange={(e) => setEatBack(e.target.checked)}
+          style={{ width: 22, height: 22, accentColor: "var(--green)", marginTop: 2 }}
+        />
+      </label>
+
+      <div className="tiny muted" style={{ marginTop: 6 }}>
+        {eatBack && !lowActivity ? (
+          <span style={{ color: "var(--peach)" }}>
+            ⚠️ Tu factor de actividad ({activity}) ya incluye entrenar. Para no contar doble,
+            ponlo en <strong>Sedentario o Ligero</strong> y deja que el entreno sume el resto.
+          </span>
+        ) : (
+          <>
+            Por defecto está <strong>desactivado</strong>: tu gasto total (TDEE) ya asume tu nivel
+            de actividad, así que el entreno se muestra como balance informativo. Actívalo solo si
+            pusiste tu actividad en Sedentario/Ligero (modelo NEAT + entreno).
+          </>
+        )}
+      </div>
     </div>
   );
 }

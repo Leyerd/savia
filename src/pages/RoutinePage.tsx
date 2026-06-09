@@ -6,6 +6,7 @@ import { useToast } from "../components/Toast";
 import { WEEKLY_ROUTINE, NUTRITION_GUIDE, TRAINING_GUIDE } from "../data/routine";
 import { EXERCISE_BY_ID, type Exercise } from "../data/exercises";
 import { useStore, type SetLog } from "../store/useStore";
+import { sessionKcal } from "../lib/energy";
 import { todayWeekdayKey, dateKey } from "../lib/date";
 import { Timer, Lock, Trophy, Info, Dumbbell, Flame, ChevronUp, ChevronDown, CheckCircle2 } from "lucide-react";
 
@@ -142,6 +143,7 @@ function ExerciseCard({ ex, note, onLog }: { ex: Exercise; note?: string; onLog:
 function LogSheet({ ex, onClose }: { ex: Exercise; onClose: () => void }) {
   const level = useStore((s) => s.getLevel(ex.id));
   const logExercise = useStore((s) => s.logExercise);
+  const weightKg = useStore((s) => s.profile.weightKg);
   const toast = useToast((s) => s.show);
   const lvl = ex.levels[level];
   const isTime = lvl.track === "tiempo";
@@ -155,8 +157,9 @@ function LogSheet({ ex, onClose }: { ex: Exercise; onClose: () => void }) {
 
   const save = () => {
     const { leveledUp } = logExercise(ex.id, sets);
+    const kcal = Math.round(sessionKcal(sets, ex, weightKg));
     if (leveledUp) toast(`🏆 ¡Subiste a Nivel ${level + 2}: ${ex.levels[level + 1].name}!`, "success");
-    else toast("Serie registrada ✅", "success");
+    else toast(kcal > 0 ? `Serie registrada ✅ · ~${kcal} kcal 🔥` : "Serie registrada ✅", "success");
     onClose();
   };
 
